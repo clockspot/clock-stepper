@@ -10,4 +10,6 @@
 // change the order as {4, 5, 6, 7};
 const int port[4] = {7, 6, 5, 4};
 
+#define BTN_DEBOUNCE_DUR 150
+
 #endif

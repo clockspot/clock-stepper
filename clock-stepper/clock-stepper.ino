@@ -7,6 +7,9 @@
 #include <Wire.h> //Arduino - GNU LPGL - for I2C access to DS3231
 #include <DS3231.h> //Andrew Wickert/NorthernWidget - The Unlicense - install in your Arduino IDE
 
+#define RTC_INT_PIN 2
+#define BTN_INT_PIN 3
+
 //RTC objects
 DS3231 ds3231;
 RTClib rtc;
@@ -34,6 +37,9 @@ void setup() {
   pinMode(port[1], OUTPUT);
   pinMode(port[2], OUTPUT);
   pinMode(port[3], OUTPUT);
+  //interrupt pins
+  pinMode(BTN_INT_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(BTN_INT_PIN), handleBtn, FALLING);
   //rtc
   Wire.begin();
   rtcTakeSnap();
@@ -127,4 +133,13 @@ void checkSerialInput(){
       default: break;
     }
   }
+}
+
+unsigned long btnLast = 0;
+void handleBtn() {
+  //Debounce
+  if((unsigned long)(millis()-btnLast)<BTN_DEBOUNCE_DUR) return;
+  btnLast = millis();
+  //Serial.println(F("Went low!"));
+  rtcSync();
 }
