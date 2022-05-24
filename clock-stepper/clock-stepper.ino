@@ -39,15 +39,22 @@ void setup() {
   pinMode(port[3], OUTPUT);
   //interrupt pins
   pinMode(BTN_INT_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(BTN_INT_PIN), handleBtn, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BTN_INT_PIN), handleBtnISR, FALLING);
+  pinMode(RTC_INT_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(RTC_INT_PIN), handleRTCISR, FALLING);
   //rtc
   Wire.begin();
+  rtcArmMinuteSignal();
   rtcTakeSnap();
   rtcSecLast = rtcGetSecond();
   rtcMinLast = rtcGetMinute();
 }
 
+volatile bool btnISR = false; //goes true after btn ISR event
+volatile bool rtcISR = false; //goes true after rtc ISR event
 void loop() {
+  if(btnISR) { btnISR = false; rtcSync(); }
+  if(rtcISR) { rtcISR = false; minuteSignal(); }
   //wait for serial input
   checkSerialInput();
   checkRTC();
@@ -59,24 +66,48 @@ void checkRTC() {
     rtcSecLast = rtcGetSecond();
     printRTCTime();
   }
-  if(rtcMinLast != rtcGetMinute()) {
-    rtcMinLast = rtcGetMinute();
-    advance();
-  }
+  // if(rtcMinLast != rtcGetMinute()) {
+  //   rtcMinLast = rtcGetMinute();
+  //   advance();
+  // }
 }
 
 void rtcTakeSnap() { tod = rtc.now(); }
 byte rtcGetSecond() { return tod.second(); }
 byte rtcGetMinute() { return tod.minute(); }
+
 void rtcSync() {
+  ds3231.setHour(0);
   ds3231.setMinute(0);
   ds3231.setSecond(0);
   rtcSecLast = 0;
   rtcMinLast = 0;
-  advance();
+  //advance();
+}
+
+void rtcArmMinuteSignal() {
+  //teach it to alarm every minute
+  int alarmBits = 0b11100000;
+  ds3231.setA1Time(0,0,0,0,alarmBits,false,false,false);
+  ds3231.turnOnAlarm(1);
+  Serial.println(alarmBits,BIN);
+  Serial.println(F("Alarm 1:"));
+  Serial.println(ds3231.checkAlarmEnabled(1));
+  Serial.println(F("Alarm 2:"));
+  Serial.println(ds3231.checkAlarmEnabled(2));
+}
+
+void minuteSignal() {
+  //from ISR via loop
+  Serial.println(F("new minute from RTC!"));
+  bool isAlarm = ds3231.checkIfAlarm(1);
+  Serial.println(isAlarm,DEC);
+  isAlarm = ds3231.checkIfAlarm(1);
+  Serial.println(isAlarm,DEC);
 }
 
 void printRTCTime() {
+  if(rtcGetSecond()%10>0) return;
   Serial.print(F(":"));
   if(rtcGetMinute()<10) Serial.print(F("0"));
   Serial.print(rtcGetMinute());
@@ -86,15 +117,25 @@ void printRTCTime() {
   Serial.println();
 }
 
+void handleRTCISR() {
+  rtcISR = true;
+}
+
 byte stepperPosCur = 0;
+volatile byte stepsRemain = 0;
 
 void advance() {
-  if(stepperPosCur==STEPPER_POS_PER_REV) stepperPosCur = 0;
-  //Find how far we need to go
-  unsigned long prev = (unsigned long)STEPPER_STEPS * (stepperPosCur) / STEPPER_POS_PER_REV;
-  unsigned long next = (unsigned long)STEPPER_STEPS * (stepperPosCur+1) / STEPPER_POS_PER_REV;
-  stepperPosCur++;
-  rotate(next-prev);
+  if(stepsRemain!=0) { //if we are moving, or btn ISR said stop, stop
+    Serial.println(F("told to stop"));
+    stepsRemain = 0;
+  } else { //if we are stopped, move
+    if(stepperPosCur==STEPPER_POS_PER_REV) stepperPosCur = 0;
+    //Find how far we need to go
+    unsigned long prev = (unsigned long)STEPPER_STEPS * (stepperPosCur) / STEPPER_POS_PER_REV;
+    unsigned long next = (unsigned long)STEPPER_STEPS * (stepperPosCur+1) / STEPPER_POS_PER_REV;
+    stepperPosCur++;
+    rotate(next-prev);
+  }
 }
 
 void rotate(int step) {
@@ -102,13 +143,14 @@ void rotate(int step) {
   int i, j;
   int delta = (step > 0) ? 1 : 7;
 
-  step = (step > 0) ? step : -step;
-  for(j = 0; j < step; j++) {
+  int stepsRemain = (step > 0) ? step : -step;
+  while(stepsRemain>0) {
     phase = (phase + delta) % 8;
     for(i = 0; i < 4; i++) {
       digitalWrite(port[i], seq[phase][i]);
     }
     delay(STEPPER_DELAY);
+    stepsRemain--;
   }
   // power cut
   for(i = 0; i < 4; i++) {
@@ -135,11 +177,12 @@ void checkSerialInput(){
   }
 }
 
-unsigned long btnLast = 0;
-void handleBtn() {
+volatile unsigned long btnLast = 0;
+void handleBtnISR() {
   //Debounce
   if((unsigned long)(millis()-btnLast)<BTN_DEBOUNCE_DUR) return;
   btnLast = millis();
-  //Serial.println(F("Went low!"));
-  rtcSync();
+  //if the motor is turning, cancel it
+  if(stepsRemain!=0) stepsRemain = -1; //TODO fix this
+  btnISR = true; //can't actually call delays/serials/etc from within ISR
 }
