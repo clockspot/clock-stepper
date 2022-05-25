@@ -45,9 +45,9 @@ void setup() {
   //rtc
   Wire.begin();
   rtcArmMinuteSignal();
-  rtcTakeSnap();
-  rtcSecLast = rtcGetSecond();
-  rtcMinLast = rtcGetMinute();
+  // rtcTakeSnap();
+  // rtcSecLast = rtcGetSecond();
+  // rtcMinLast = rtcGetMinute();
 }
 
 volatile bool btnISR = false; //goes true after btn ISR event
@@ -55,9 +55,8 @@ volatile bool rtcISR = false; //goes true after rtc ISR event
 void loop() {
   if(btnISR) { btnISR = false; rtcSync(); }
   if(rtcISR) { rtcISR = false; minuteSignal(); }
-  //wait for serial input
   checkSerialInput();
-  checkRTC();
+  //checkRTC();
 }
 
 void checkRTC() {
@@ -80,30 +79,37 @@ void rtcSync() {
   ds3231.setHour(0);
   ds3231.setMinute(0);
   ds3231.setSecond(0);
-  rtcSecLast = 0;
-  rtcMinLast = 0;
-  //advance();
+  //rtcSecLast = 0;
+  //rtcMinLast = 0;
+  //advance(); //not necessary as it will trip the alarm
 }
 
 void rtcArmMinuteSignal() {
   //teach it to alarm every minute
-  int alarmBits = 0b11100000;
+  byte ALRM1_SET = 0b1110; //ALRM1_MATCH_SEC
+  byte ALRM2_SET = 0b111; //ALRM2_ONCE_PER_MIN
+  //int alarmBits = 0b1111110;
+  int alarmBits = ALRM2_SET;
+  alarmBits <<= 4;
+  alarmBits |= ALRM1_SET;
   ds3231.setA1Time(0,0,0,0,alarmBits,false,false,false);
   ds3231.turnOnAlarm(1);
-  Serial.println(alarmBits,BIN);
-  Serial.println(F("Alarm 1:"));
-  Serial.println(ds3231.checkAlarmEnabled(1));
-  Serial.println(F("Alarm 2:"));
-  Serial.println(ds3231.checkAlarmEnabled(2));
+  // Serial.println(F("Bits:"));
+  // Serial.println(alarmBits,BIN);
+  // Serial.println(F("Alarm 1:"));
+  // Serial.println(ds3231.checkAlarmEnabled(1));
+  // Serial.println(F("Alarm 2:"));
+  // Serial.println(ds3231.checkAlarmEnabled(2));
 }
 
 void minuteSignal() {
   //from ISR via loop
   Serial.println(F("new minute from RTC!"));
-  bool isAlarm = ds3231.checkIfAlarm(1);
-  Serial.println(isAlarm,DEC);
-  isAlarm = ds3231.checkIfAlarm(1);
-  Serial.println(isAlarm,DEC);
+  ds3231.checkIfAlarm(1);
+  // Serial.println(isAlarm,DEC);
+  // isAlarm = ds3231.checkIfAlarm(1);
+  // Serial.println(isAlarm,DEC);
+  advance();
 }
 
 void printRTCTime() {
@@ -115,6 +121,10 @@ void printRTCTime() {
   if(rtcGetSecond()<10) Serial.print(F("0"));
   Serial.print(rtcGetSecond());
   Serial.println();
+  // bool isAlarm = ds3231.checkIfAlarm(1);
+  // Serial.println(isAlarm,DEC);
+  // isAlarm = ds3231.checkIfAlarm(1);
+  // Serial.println(isAlarm,DEC);
 }
 
 void handleRTCISR() {
@@ -185,4 +195,5 @@ void handleBtnISR() {
   //if the motor is turning, cancel it
   if(stepsRemain!=0) stepsRemain = -1; //TODO fix this
   btnISR = true; //can't actually call delays/serials/etc from within ISR
+  //TODO NEXT: make duplicate presses actually stop the motion and not double up
 }
