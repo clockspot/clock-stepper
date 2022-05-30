@@ -40,9 +40,6 @@ Before compiling and uploading, you will need to select the correct board, port,
 * If upload fails for an ATMega328P Arduino (e.g. classic Nano), try selecting/unselecting “Old Bootloader” in the processor menu.
 
 ## TODO
-* Drive stepper motor at RTC minute change
-* Manual advance/sync using button interrupt
-* Low-power mode with RTC interrupt
 * Internal representation of display via sensing switches
 * Drive hour / date motors
 * Set RTC via IoT and wait to sync display
