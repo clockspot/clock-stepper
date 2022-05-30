@@ -12,10 +12,6 @@
 
 //RTC objects
 DS3231 ds3231;
-RTClib rtc;
-DateTime tod;
-byte rtcSecLast = 61;
-byte rtcMinLast = 61;
 
 // sequence of stepper motor control
 const int seq[8][4] = {
@@ -45,35 +41,15 @@ void setup() {
   //rtc
   Wire.begin();
   rtcArmMinuteSignal();
-  // rtcTakeSnap();
-  // rtcSecLast = rtcGetSecond();
-  // rtcMinLast = rtcGetMinute();
 }
 
 volatile bool btnISR = false; //goes true after btn ISR event
 volatile bool rtcISR = false; //goes true after rtc ISR event
 void loop() {
   if(btnISR) { btnISR = false; rtcSync(); }
-  if(rtcISR) { rtcISR = false; minuteSignal(); }
+  if(rtcISR) { rtcISR = false; rtcMinuteSignal(); }
   checkSerialInput();
-  //checkRTC();
 }
-
-void checkRTC() {
-  rtcTakeSnap();
-  if(rtcSecLast != rtcGetSecond()) {
-    rtcSecLast = rtcGetSecond();
-    printRTCTime();
-  }
-  // if(rtcMinLast != rtcGetMinute()) {
-  //   rtcMinLast = rtcGetMinute();
-  //   advance();
-  // }
-}
-
-void rtcTakeSnap() { tod = rtc.now(); }
-byte rtcGetSecond() { return tod.second(); }
-byte rtcGetMinute() { return tod.minute(); }
 
 void rtcSync() {
   ds3231.setHour(0);
@@ -86,45 +62,22 @@ void rtcSync() {
 
 void rtcArmMinuteSignal() {
   //teach it to alarm every minute
+  //TODO learn enough about bitwise ops to simplify this
   byte ALRM1_SET = 0b1110; //ALRM1_MATCH_SEC
   byte ALRM2_SET = 0b111; //ALRM2_ONCE_PER_MIN
-  //int alarmBits = 0b1111110;
   int alarmBits = ALRM2_SET;
   alarmBits <<= 4;
   alarmBits |= ALRM1_SET;
   ds3231.setA1Time(0,0,0,0,alarmBits,false,false,false);
   ds3231.turnOnAlarm(1);
-  // Serial.println(F("Bits:"));
-  // Serial.println(alarmBits,BIN);
-  // Serial.println(F("Alarm 1:"));
-  // Serial.println(ds3231.checkAlarmEnabled(1));
-  // Serial.println(F("Alarm 2:"));
-  // Serial.println(ds3231.checkAlarmEnabled(2));
 }
 
-void minuteSignal() {
+void rtcMinuteSignal() {
   //from ISR via loop
   Serial.println(F("new minute from RTC!"));
-  ds3231.checkIfAlarm(1);
-  // Serial.println(isAlarm,DEC);
-  // isAlarm = ds3231.checkIfAlarm(1);
-  // Serial.println(isAlarm,DEC);
+  ds3231.checkIfAlarm(1); //"cancels" this instance of alarm
   advance();
-}
-
-void printRTCTime() {
-  if(rtcGetSecond()%10>0) return;
-  Serial.print(F(":"));
-  if(rtcGetMinute()<10) Serial.print(F("0"));
-  Serial.print(rtcGetMinute());
-  Serial.print(F(":"));
-  if(rtcGetSecond()<10) Serial.print(F("0"));
-  Serial.print(rtcGetSecond());
-  Serial.println();
-  // bool isAlarm = ds3231.checkIfAlarm(1);
-  // Serial.println(isAlarm,DEC);
-  // isAlarm = ds3231.checkIfAlarm(1);
-  // Serial.println(isAlarm,DEC);
+  //TODO sleep again
 }
 
 void handleRTCISR() {
