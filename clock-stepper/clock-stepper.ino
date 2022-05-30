@@ -28,8 +28,8 @@ const int STEPPER_SEQ[8][4] = {
 };
 
 void setup() {
-  Serial.begin(9600);
-  Serial.println(F("Hello world"));
+  //Serial.begin(9600);
+  //Serial.println(F("Hello world"));
   //motor pins
   for(int i=0; i<4; i++) pinMode(STEPPER_PINS[i], OUTPUT);
   //interrupt pins - these will wake up the Arduino
@@ -47,19 +47,19 @@ volatile bool setRTC = false; //set by btn ISR (sometimes)
 volatile bool newMinute = false; //set by rtc ISR
 
 void loop() {
-  Serial.println(F("Loop:"));
+  //Serial.println(F("Loop:"));
   if(setRTC) { setRTC = false; rtcSet(); }
   if(newMinute) { newMinute = false; advance(); }
   //checkSerialInput();
 
   //After doing the things, go asleep again
-  Serial.println(F("Sleep."));
+  //Serial.println(F("Sleep."));
   delay(500); //why
   LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
 }
 
 void rtcSet() {
-  Serial.println(F("rtc set!"));
+  //Serial.println(F("rtc set!"));
   ds3231.setHour(0);
   ds3231.setMinute(0);
   ds3231.setSecond(0);
@@ -88,7 +88,7 @@ void advance() {
   ds3231.checkIfAlarm(1); //"cancels" this instance of alarm
   //Rather than using a library like Stepper.h, which uses whole steps,
   //this code (adapted via shiura) controls more finely via substeps
-  Serial.println(F("Advance!"));
+  //Serial.println(F("Advance!"));
   if(stepperPosCur==STEPPER_POS_PER_REV) stepperPosCur = 0;
   unsigned long substepCur =
     (unsigned long)STEPPER_SUBSTEPS * (stepperPosCur) / STEPPER_POS_PER_REV;
