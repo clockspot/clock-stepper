@@ -132,6 +132,7 @@ void handleBtnISR() {
   if((unsigned long)(millis()-btnLast)<BTN_DEBOUNCE_DUR) return;
   btnLast = millis();
   //if advancing, immediately cancel it
+  //Used to "teach" the Arduino where to stop the motor between advances
   if(substepsRemain) {
     stepperPosCur = 0;
     substepsRemain = 0;
